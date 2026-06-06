@@ -25,6 +25,15 @@ jobs:
           pip install "hopsworks==4.7.*"
           pip install confluent-kafka
 
+      - name: Fetch data and engineer features
+        env:
+          WAQI_TOKEN: ${{ secrets.WAQI_TOKEN }}
+          OWM_KEY: ${{ secrets.OWM_KEY }}
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+        run: |
+          python fetch_data.py
+          python feature_engineering.py
+
       - name: Train models and register champion in Hopsworks
         env:
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
