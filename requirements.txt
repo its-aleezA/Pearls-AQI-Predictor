@@ -3,6 +3,7 @@ pandas
 numpy
 scikit-learn>=1.4.0
 hopsworks>=4.7.0
+confluent-kafka
 joblib
 matplotlib
 seaborn
