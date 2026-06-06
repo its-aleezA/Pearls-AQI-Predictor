@@ -20,7 +20,10 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install "hopsworks==4.7.*"
+          pip install confluent-kafka
 
       - name: Train models and register champion in Hopsworks
         env:
