@@ -2,7 +2,7 @@ name: Feature Pipeline (Hourly)
 
 on:
   schedule:
-    - cron: "0 * * * *"     # every hour on the hour
+    - cron: "0 * * * *"  # every hour on the hour
   workflow_dispatch:        # allow manual trigger from GitHub UI
 
 jobs:
@@ -20,7 +20,10 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install "hopsworks==4.7.*"
+          pip install confluent-kafka
 
       - name: Fetch raw AQI + weather data
         env:
