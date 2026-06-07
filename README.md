@@ -23,7 +23,7 @@
 - [Feature Engineering](#-feature-engineering)
 - [Machine Learning Models](#-machine-learning-models)
 - [Model Performance](#-model-performance)
-- [Explainability — SHAP](#-explainability--shap)
+- [Explainability : SHAP](#-explainability--shap)
 - [CI/CD Automation](#-cicd-automation)
 - [Tech Stack](#-tech-stack)
 - [Repository Structure](#-repository-structure)
@@ -69,38 +69,7 @@ The dashboard auto-updates every time the daily training pipeline runs and commi
 
 ## 🏗️ System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        GitHub Actions                           │
-│                                                                 │
-│  ┌─────────────────────┐      ┌──────────────────────────────┐  │
-│  │  Feature Pipeline   │      │    Training Pipeline         │  │
-│  │  (runs every hour)  │      │    (runs every day @ 2am)    │  │
-│  │                     │      │                              │  │
-│  │  fetch_data.py      │      │  backfill_data.py            │  │
-│  │  feature_eng.py     │      │  feature_engineering.py      │  │
-│  │  upload_hopsworks   │      │  train_aqi_model.py          │  │
-│  └────────┬────────────┘      │  batch_inference.py          │  │
-│           │                   └──────────┬───────────────────┘  │
-└───────────┼──────────────────────────────┼─────────────────────┘
-            │                              │
-            ▼                              ▼
-   ┌─────────────────┐           ┌──────────────────┐
-   │   Hopsworks     │           │   Hopsworks       │
-   │  Feature Store  │◄──────────│  Model Registry   │
-   │  (aqi_predict.  │           │  (champion model  │
-   │   ions v2)      │           │   + scaler +      │
-   └────────┬────────┘           │   SHAP plot)      │
-            │                    └──────────┬─────────┘
-            │                               │
-            └──────────────┬────────────────┘
-                           ▼
-                  ┌─────────────────┐
-                  │  Streamlit App  │
-                  │  (auto-deploys  │
-                  │   on git push)  │
-                  └─────────────────┘
-```
+![System Architecture Diagram](docs/pearls_aqi_architecture.jpg)
 
 ---
 
@@ -175,7 +144,7 @@ The batch inference script:
 
 1. Downloads the latest champion model and scaler from the Hopsworks Model Registry (always fetches the highest version number dynamically)
 2. Reads the latest features from the Feature Store (CSV fallback if materializing)
-3. Generates **historical validation predictions** — actual vs. predicted on the full feature history
+3. Generates **historical validation predictions** : actual vs. predicted on the full feature history
 4. Generates a **72-hour autoregressive forward forecast** using a sliding `window_history` buffer:
    - Seeds the buffer with the last 24 actual AQI values
    - At each step, computes rolling statistics and lag features from the live buffer
@@ -222,7 +191,7 @@ The Streamlit dashboard (`app.py`) then reads these CSVs directly. Because the t
 
 **Why lag features matter:** Air quality has strong temporal autocorrelation; if AQI has been rising for 3 hours, it's likely to keep rising. Without lag features, the model has no memory of recent conditions and is forced to predict from static features alone. The 24-hour lag captures the same-time-yesterday effect, which is powerful for seasonal/diurnal patterns.
 
-**Why rolling statistics matter:** Rolling means smooth out noise and capture the sustained trend, while rolling standard deviations capture volatility — a sudden spike in AQI std suggests an anomalous pollution event.
+**Why rolling statistics matter:** Rolling means smooth out noise and capture the sustained trend, while rolling standard deviations capture volatility; a sudden spike in AQI std suggests an anomalous pollution event.
 
 ---
 
@@ -275,13 +244,13 @@ Performance on the current dataset (216 hourly rows from WAQI backfill + hourly 
 | Gradient Boosting | 21.97 | 15.73 | -0.15 |
 | **Ridge Regression ← Champion** | **12.90** | **7.60** | **-0.13** |
 
-> **Note on negative R²:** R² is negative when the model performs worse than simply predicting the mean. This is expected at low data volumes, with only ~70 usable rows after cleaning (lag features produce NaN for the first 24 rows), each TimeSeriesSplit fold has only ~11 training samples. R² will converge to positive territory as the hourly pipeline accumulates data over days and weeks. RMSE and MAE are the more meaningful metrics at this stage and show Ridge Regression's advantage — its linear inductive bias generalises better than tree ensembles on small datasets.
+> **Note on negative R²:** R² is negative when the model performs worse than simply predicting the mean. This is expected at low data volumes, with only ~70 usable rows after cleaning (lag features produce NaN for the first 24 rows), each TimeSeriesSplit fold has only ~11 training samples. R² will converge to positive territory as the hourly pipeline accumulates data over days and weeks. RMSE and MAE are the more meaningful metrics at this stage and show Ridge Regression's advantage; its linear inductive bias generalises better than tree ensembles on small datasets.
 
 ---
 
 ## 🔍 Explainability (SHAP)
 
-SHAP (SHapley Additive exPlanations) is used to explain model predictions. For tree-based champion models (Random Forest, Gradient Boosting), `shap.TreeExplainer` is used — an exact, model-native method that is computationally efficient. For Ridge Regression, permutation importance is used as a fallback.
+SHAP (SHapley Additive exPlanations) is used to explain model predictions. For tree-based champion models (Random Forest, Gradient Boosting), `shap.TreeExplainer` is used, an exact, model-native method that is computationally efficient. For Ridge Regression, permutation importance is used as a fallback.
 
 The SHAP summary plot shows:
 - **Feature importance** (features ranked by mean |SHAP value|)
@@ -318,7 +287,7 @@ Steps:
 6. python upload_to_hopsworks.py           → upserts to Feature Store
 ```
 
-### Training Pipeline — Daily
+### Training Pipeline (Daily)
 
 **File:** `.github/workflows/training_pipeline.yml`  
 **Schedule:** `0 2 * * *` (2:00 AM UTC = 7:00 AM PKT)
@@ -337,7 +306,7 @@ Steps:
 10. git push origin main                    → triggers Streamlit Cloud redeploy
 ```
 
-Both workflows use **GitHub Secrets** for API key injection (`WAQI_TOKEN`, `OWM_KEY`, `HOPSWORKS_API_KEY`) — no credentials are ever hardcoded or committed.
+Both workflows use **GitHub Secrets** for API key injection (`WAQI_TOKEN`, `OWM_KEY`, `HOPSWORKS_API_KEY`), no credentials are ever hardcoded or committed.
 
 ---
 
@@ -460,7 +429,7 @@ streamlit run app.py
 | Open-Meteo | Historical weather (60+ days) | `archive-api.open-meteo.com/v1/archive` | No |
 | WAQI Forecast | Historical AQI backfill (fallback) | `api.waqi.info/feed/{city}/` | Yes (free) |
 
-All APIs used are free tier. The system is designed to degrade gracefully — if WAQI is unavailable, the run is skipped and logged; if OWM fails, weather columns are set to `None` and filled later with medians.
+All APIs used are free tier. The system is designed to degrade gracefully; if WAQI is unavailable, the run is skipped and logged; if OWM fails, weather columns are set to `None` and filled later with medians.
 
 ---
 
@@ -494,15 +463,15 @@ The dashboard uses a custom colour palette (`#B8D8D8` light blue / `#7A9E9F` coo
 
 ## 💡 Key Design Decisions
 
-**TimeSeriesSplit over random split:** Standard `train_test_split` with `shuffle=True` leaks future data into the training set for time-series tasks. `TimeSeriesSplit` strictly respects temporal ordering — the model always trains on the past and evaluates on the future.
+**TimeSeriesSplit over random split:** Standard `train_test_split` with `shuffle=True` leaks future data into the training set for time-series tasks. `TimeSeriesSplit` strictly respects temporal ordering; the model always trains on the past and evaluates on the future.
 
 **Fallback chain for data access:** Rather than crashing when Hopsworks' offline store hasn't finished materializing (a ~5 minute lag on the free tier), every script has a graceful fallback to local CSVs. This makes the pipeline resilient to infrastructure delays without human intervention.
 
-**`window_history` sliding buffer in inference:** Naively using the last known feature row for all 72 forecast steps would freeze rolling statistics and lag features at their last observed values, producing increasingly inaccurate predictions. The sliding buffer updates rolling stats and lag values at every step using previous predictions as context — mathematically equivalent to how the features were computed during training.
+**`window_history` sliding buffer in inference:** Naively using the last known feature row for all 72 forecast steps would freeze rolling statistics and lag features at their last observed values, producing increasingly inaccurate predictions. The sliding buffer updates rolling stats and lag values at every step using previous predictions as context; mathematically equivalent to how the features were computed during training.
 
 **`[skip ci]` on automated commits:** The training pipeline commits updated prediction CSVs back to `main`. Without `[skip ci]`, this commit would trigger the training pipeline again, creating an infinite loop. The tag instructs GitHub Actions to ignore the commit for workflow triggering.
 
-**No model binaries in git:** `.pkl` and `.keras` files are excluded from version control via `.gitignore`. Models live in the Hopsworks Model Registry — the only source of truth for trained artifacts. This keeps the repository lightweight and avoids binary diff noise.
+**No model binaries in git:** `.pkl` and `.keras` files are excluded from version control via `.gitignore`. Models live in the Hopsworks Model Registry; the only source of truth for trained artifacts. This keeps the repository lightweight and avoids binary diff noise.
 
 ---
 
