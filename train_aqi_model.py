@@ -1,14 +1,3 @@
-"""
-train_aqi_model.py
-------------------
-Training pipeline:
-  1. Reads features from the Hopsworks Feature Store
-  2. Trains and evaluates classical ML + a deep learning model
-  3. Selects the champion by RMSE using TimeSeriesSplit (no data leakage)
-  4. Computes SHAP feature importance
-  5. Registers the champion model + SHAP plot in the Hopsworks Model Registry
-"""
-
 import os
 import warnings
 import hopsworks
@@ -30,7 +19,7 @@ from sklearn.preprocessing import StandardScaler
 warnings.filterwarnings("ignore")
 load_dotenv()
 
-# ── 1. Connect and read features from Hopsworks ──────────────────────────────
+# 1. Connect and read features from Hopsworks
 print("🔗 Connecting to Hopsworks...")
 project = hopsworks.login(api_key_value=os.getenv("HOPSWORKS_API_KEY"))
 fs = project.get_feature_store()
@@ -49,17 +38,15 @@ except Exception as e:
     else:
         raise
 
-# ── 2. Prepare features and target ───────────────────────────────────────────
-# Sort chronologically — essential for TimeSeriesSplit
+# 2. Prepare features and target 
+# Sort chronologically : essential for TimeSeriesSplit
 df = df.sort_values("timestamp").reset_index(drop=True)
 
-# Only drop rows where core features are missing — pollutant columns (pm10, no2 etc.)
-# may be all-NaN from the WAQI fallback and would wipe the entire dataset if included.
+# Only drop rows where core features are missing : pollutant columns (pm10, no2 etc.) may be all-NaN from the WAQI fallback and would wipe the entire dataset if included
 core_cols = ["aqi", "temp", "humidity", "hour", "aqi_lag_1", "aqi_rolling_6h_mean"]
 df = df.dropna(subset=[c for c in core_cols if c in df.columns])
 
-# Fill all-NaN columns (e.g. pm10/no2/o3 missing from WAQI fallback) with 0 first,
-# then fill any remaining partial NaNs with column medians
+# Fill all-NaN columns (e.g. pm10/no2/o3 missing from WAQI fallback) with 0 first, # then fill any remaining partial NaNs with column medians
 df = df.fillna(0) if df.isnull().all().any() else df
 df = df.fillna(df.median(numeric_only=True))
 df = df.fillna(0)   # catch any columns whose median is also NaN
@@ -73,10 +60,10 @@ y = df["aqi"].values
 
 print(f"📐 Features used ({len(FEATURE_COLS)}): {FEATURE_COLS}")
 
-# ── 3. TimeSeriesSplit cross-validation (no data leakage) ───────────────────
+# 3. TimeSeriesSplit cross-validation (no data leakage) 
 tscv = TimeSeriesSplit(n_splits=5)
 
-# ── 4. Define candidate models ───────────────────────────────────────────────
+# 4. Define candidate models 
 candidates = {
     "Random_Forest":       RandomForestRegressor(n_estimators=200, random_state=42, n_jobs=-1),
     "Gradient_Boosting":   GradientBoostingRegressor(n_estimators=200, random_state=42),
@@ -114,7 +101,7 @@ for name, model in candidates.items():
     print(f"   {name:30s}  RMSE={avg_rmse:.2f}  MAE={avg_mae:.2f}  R²={avg_r2:.4f}")
 
 
-# ── 5. Add a simple LSTM deep learning model ─────────────────────────────────
+# 5. Add a simple LSTM deep learning model 
 try:
     import tensorflow as tf
     from tensorflow.keras.models import Sequential
@@ -164,9 +151,9 @@ try:
     print(f"   {'LSTM':30s}  RMSE={lstm_rmse:.2f}  MAE={lstm_mae:.2f}  R²={lstm_r2:.4f}")
 
 except ImportError:
-    print("   ⚠️  TensorFlow not installed — skipping LSTM (pip install tensorflow)")
+    print("   ⚠️  TensorFlow not installed : skipping LSTM (pip install tensorflow)")
 
-# ── 6. Select champion ───────────────────────────────────────────────────────
+# 6. Select champion 
 best_name = min(results, key=lambda k: results[k]["RMSE"])
 best_metrics = results[best_name]
 print(f"\n🏆 Champion: {best_name}  →  {best_metrics}")
@@ -181,7 +168,7 @@ else:
     champion = candidates[best_name]
     champion.fit(X_all_s, y)
 
-# ── 7. SHAP feature importance (tree models only) ────────────────────────────
+# 7. SHAP feature importance (tree models only) 
 os.makedirs("models", exist_ok=True)
 shap_plot_path = "models/shap_summary.png"
 
@@ -213,7 +200,7 @@ else:
     plt.savefig(shap_plot_path, dpi=120, bbox_inches="tight")
     plt.close()
 
-# ── 8. Save model + scaler locally ───────────────────────────────────────────
+# 8. Save model + scaler locally 
 model_path  = "models/aqi_model.pkl"
 scaler_path = "models/scaler.pkl"
 
@@ -226,12 +213,11 @@ else:
 joblib.dump(final_scaler, scaler_path)
 print(f"💾 Model saved → {model_path}")
 
-# ── 9. Register in Hopsworks Model Registry ──────────────────────────────────
+# 9. Register in Hopsworks Model Registry 
 print("📤 Registering champion model in Hopsworks...")
 mr = project.get_model_registry()
 
 def sanitize_metric(v):
-    """Replace NaN/inf with 0.0 — Hopsworks rejects non-numeric JSON values."""
     import math
     try:
         f = float(v)
