@@ -44,7 +44,7 @@ df = df.sort_values("timestamp").reset_index(drop=True)
 
 # Only drop rows where core features are missing : pollutant columns (pm10, no2 etc.) may be all-NaN from the WAQI fallback and would wipe the entire dataset if included
 core_cols = ["aqi", "temp", "humidity", "hour", "aqi_lag_1", "aqi_rolling_6h_mean"]
-df = df.dropna(subset=[c for c in core_cols if c in df.columns])
+df = df.dropna(subset=["aqi"])
 
 # Fill all-NaN columns (e.g. pm10/no2/o3 missing from WAQI fallback) with 0 first, # then fill any remaining partial NaNs with column medians
 df = df.fillna(0) if df.isnull().all().any() else df
