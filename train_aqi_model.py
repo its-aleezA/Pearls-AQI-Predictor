@@ -32,6 +32,7 @@ except Exception as e:
     if "No hudi properties" in str(e) or "no data has been written" in str(e).lower():
         print("⚠️  Hopsworks offline store still materializing : falling back to local CSV...")
         csv_path = "aqi_features.csv" if os.path.exists("aqi_features.csv") else "aqi_history.csv"
+        csv_path = "aqi_features.csv" if os.path.exists("aqi_features.csv") else "aqi_history.csv"
         df = pd.read_csv(csv_path)
         print(f"✅ Loaded {len(df)} rows from {csv_path}")
     else:
